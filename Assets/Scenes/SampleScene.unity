@@ -776,9 +776,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 234119fdc960e754a9102a43ad918fbf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxLength: 10
-  enemyHoverMaxDistance: 1.5
-  enemyLayerMask:
+  TileSize: 1
+  MaxChainLength: 5
+  <EnemyLayerMask>k__BackingField:
     serializedVersion: 2
     m_Bits: 64
 --- !u!120 &1910922632

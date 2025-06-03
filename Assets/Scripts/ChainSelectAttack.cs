@@ -1,106 +1,162 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(LineRenderer))]
-public class ChainSelectAttack : MonoBehaviour
+public class SwipeChainSelectAttack : MonoBehaviour
 {
-    public float maxLength = 10f;
-    public float enemyHoverMaxDistance = 1.5f;
-    public LayerMask enemyLayerMask;
+    [field: SerializeField] public float TileSize = 1f;
+    [field: SerializeField] public int MaxChainLength = 5;
+    [field: SerializeField] public LayerMask EnemyLayerMask { get; private set; }
 
-    private LineRenderer lineRenderer;
-    private Camera mainCamera;
-    private Transform player;
-    private Transform lockedEnemy;
+    private LineRenderer _lineRenderer;
+    private Camera _mainCamera;
+    private Transform _player;
 
+    private bool _isSwiping = false;
+    private Vector2Int _currentGridPos;
+    private List<Vector2Int> _swipeChain = new();
+    private HashSet<Vector2Int> _visitedPositions = new();
+    private List<Transform> _lockedEnemies = new();
 
     void OnEnable()
     {
-        lineRenderer = GetComponent<LineRenderer>();
+        _lineRenderer = GetComponent<LineRenderer>();
+        _lineRenderer.startWidth = 0.05f;
+        _lineRenderer.endWidth = 0.05f;
 
-        //make line thinner
-        lineRenderer.startWidth = 0.05f;
-
-        mainCamera = Camera.main;
+        _mainCamera = Camera.main;
 
         GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
         if (playerObj != null)
         {
-            player = playerObj.transform;
+            _player = playerObj.transform;
         }
         else
         {
-            Debug.LogWarning("ChainSelectAttack: No GameObject with tag 'Player' found in scene.");
+            Debug.LogWarning("SwipeChainSelectAttack: No GameObject with tag 'Player' found.");
         }
-
-        lockedEnemy = null;
     }
 
     void Update()
     {
-        if (mainCamera == null || player == null) return;
+        if (_mainCamera == null || _player == null) return;
 
-        Vector3 playerPosition = player.position;
-        Vector3 mouseWorldPosition = GetMouseWorldPosition();
+        if (Input.GetMouseButtonDown(0))
+        {
+            BeginSwipe();
+        }
+        else if (Input.GetMouseButton(0) && _isSwiping)
+        {
+            UpdateSwipe();
+        }
+        else if (Input.GetMouseButtonUp(0) && _isSwiping)
+        {
+            EndSwipe();
+        }
 
-        Vector3 direction = (mouseWorldPosition - playerPosition).normalized;
-        float distance = Mathf.Min(Vector3.Distance(playerPosition, mouseWorldPosition), maxLength);
-        Vector3 clampedMousePosition = playerPosition + direction * distance;
-
-        TryLockOrUnlockEnemy(clampedMousePosition);
-
-        Vector3 endPoint = lockedEnemy ? GetEnemyHoverPosition(lockedEnemy) : clampedMousePosition;
-
-        lineRenderer.positionCount = 2;
-        lineRenderer.SetPosition(0, playerPosition);
-        lineRenderer.SetPosition(1, endPoint);
+        DrawLine();
     }
 
-    private void TryLockOrUnlockEnemy(Vector3 clampedMousePos)
+    void BeginSwipe()
     {
-        Vector3 worldMousePos = GetMouseWorldPosition();
-        Vector2 mousePos2D = new Vector2(worldMousePos.x, worldMousePos.y);
+        _isSwiping = true;
+        _swipeChain.Clear();
+        _visitedPositions.Clear();
+        _lockedEnemies.Clear();
 
-        // Try to hit an enemy directly under the mouse using Physics2D
-        RaycastHit2D hit = Physics2D.Raycast(mousePos2D, Vector2.zero, 0f, enemyLayerMask);
+        _currentGridPos = WorldToGrid(_player.position);
+        _swipeChain.Add(_currentGridPos);
+        _visitedPositions.Add(_currentGridPos);
+    }
 
-        if (hit.collider != null && hit.collider.CompareTag("Enemy"))
+    void UpdateSwipe()
+    {
+        Vector2 mouseWorld = GetMouseWorldPosition();
+        Vector2Int newGridPos = WorldToGrid(mouseWorld);
+
+        if (newGridPos == _currentGridPos || _swipeChain.Count == 0)
+            return;
+
+        Vector2Int dir = newGridPos - _currentGridPos;
+
+        // Allow only cardinal directions and steps of exactly 1 tile
+        if (!IsCardinal(dir) || dir.magnitude != 1)
+            return;
+
+        // Check if going back one step
+        if (_swipeChain.Count >= 2 && newGridPos == _swipeChain[_swipeChain.Count - 2])
         {
-            // Debug.Log($"Enemy {hit.collider.name} hovered at {hit.point}");
-            // Debug.Break();
-            lockedEnemy = hit.collider.transform;
+            // Undo last step
+            _visitedPositions.Remove(_currentGridPos);
+            _swipeChain.RemoveAt(_swipeChain.Count - 1);
+            _currentGridPos = _swipeChain[_swipeChain.Count - 1];
+
+            // Also remove last enemy if it was on that tile
+            if (_lockedEnemies.Count > 0)
+            {
+                Transform lastEnemy = _lockedEnemies[_lockedEnemies.Count - 1];
+                if (WorldToGrid(lastEnemy.position) == newGridPos)
+                    _lockedEnemies.RemoveAt(_lockedEnemies.Count - 1);
+            }
+
             return;
         }
 
-        // If already locked, check if mouse moved too far from enemy screen position
-        if (lockedEnemy != null)
-        {
-            Vector3 enemyScreenPos = mainCamera.WorldToScreenPoint(lockedEnemy.position);
-            float distFromEnemyScreen = Vector2.Distance(Input.mousePosition, enemyScreenPos);
+        if (_visitedPositions.Contains(newGridPos) || _swipeChain.Count >= MaxChainLength)
+            return;
 
-            if (distFromEnemyScreen > enemyHoverMaxDistance)
-            {
-                lockedEnemy = null;
-            }
+        _swipeChain.Add(newGridPos);
+        _visitedPositions.Add(newGridPos);
+        _currentGridPos = newGridPos;
+
+        Collider2D hit = Physics2D.OverlapPoint(GridToWorld(newGridPos), EnemyLayerMask);
+        if (hit != null && hit.CompareTag("Enemy"))
+        {
+            _lockedEnemies.Add(hit.transform);
         }
     }
 
 
-
-    private Vector3 GetMouseWorldPosition()
+    void EndSwipe()
     {
-        Vector3 mousePosition = Input.mousePosition;
-        Vector3 worldPosition = mainCamera.ScreenToWorldPoint(new Vector3(mousePosition.x, mousePosition.y, mainCamera.nearClipPlane));
-
-        if (worldPosition.z < 0)
-        {
-            worldPosition.z = 0;
-        }
-
-        return worldPosition;
+        _isSwiping = false;
+        // Do something with lockedEnemies if needed
+        Debug.Log($"Swipe complete. Chained {_lockedEnemies.Count} enemies.");
     }
 
-    private Vector3 GetEnemyHoverPosition(Transform enemy)
+    void DrawLine()
     {
-        return enemy.position;
+        Vector3[] linePoints = new Vector3[_swipeChain.Count];
+        for (int i = 0; i < _swipeChain.Count; i++)
+        {
+            linePoints[i] = GridToWorld(_swipeChain[i]);
+        }
+        _lineRenderer.positionCount = linePoints.Length;
+        _lineRenderer.SetPositions(linePoints);
+    }
+
+    Vector2Int WorldToGrid(Vector3 worldPos)
+    {
+        return new Vector2Int(
+            Mathf.RoundToInt(worldPos.x / TileSize),
+            Mathf.RoundToInt(worldPos.y / TileSize)
+        );
+    }
+
+    Vector3 GridToWorld(Vector2Int gridPos)
+    {
+        return new Vector3(gridPos.x * TileSize, gridPos.y * TileSize, 0f);
+    }
+
+    bool IsCardinal(Vector2Int dir)
+    {
+        return (dir == Vector2Int.up || dir == Vector2Int.down || dir == Vector2Int.left || dir == Vector2Int.right);
+    }
+
+    Vector3 GetMouseWorldPosition()
+    {
+        Vector3 mouseScreen = Input.mousePosition;
+        Vector3 worldPos = _mainCamera.ScreenToWorldPoint(new Vector3(mouseScreen.x, mouseScreen.y, -_mainCamera.transform.position.z));
+        return new Vector3(worldPos.x, worldPos.y, 0);
     }
 }
