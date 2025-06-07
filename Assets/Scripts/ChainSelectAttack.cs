@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 [RequireComponent(typeof(LineRenderer))]
 public class SwipeChainSelectAttack : MonoBehaviour
@@ -7,6 +8,9 @@ public class SwipeChainSelectAttack : MonoBehaviour
     [field: SerializeField] public float TileSize = 1f;
     [field: SerializeField] public int MaxChainLength = 5;
     [field: SerializeField] public LayerMask EnemyLayerMask { get; private set; }
+
+    public event Action<List<Vector2Int>> OnChainConfirmed;
+    // private List<Vector2Int> _currentChain = new List<Vector2Int>();
 
     private LineRenderer _lineRenderer;
     private Camera _mainCamera;
@@ -122,6 +126,12 @@ public class SwipeChainSelectAttack : MonoBehaviour
         _isSwiping = false;
         // Do something with lockedEnemies if needed
         Debug.Log($"Swipe complete. Chained {_lockedEnemies.Count} enemies.");
+
+        if (_swipeChain.Count > 0)
+        {
+            OnChainConfirmed?.Invoke(new List<Vector2Int>(_swipeChain));
+        }
+
     }
 
     void DrawLine()

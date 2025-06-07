@@ -835,7 +835,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   TileSize: 1
-  MaxChainLength: 5
+  MaxChainLength: 10
   <EnemyLayerMask>k__BackingField:
     serializedVersion: 2
     m_Bits: 64

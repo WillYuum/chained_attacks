@@ -21,6 +21,23 @@ public class GameStateController : MonoBehaviour
         SetState(GameState.Roaming);
     }
 
+    void Update()
+    {
+        //manual switching state
+        bool clickedSpace = Input.GetKeyDown(KeyCode.Space);
+        if (clickedSpace)
+        {
+            if (CurrentState == GameState.Roaming)
+            {
+                SetState(GameState.Battle);
+            }
+            else if (CurrentState == GameState.Battle)
+            {
+                SetState(GameState.Roaming);
+            }
+        }
+    }
+
 
     public void SetState(GameState newState)
     {
