@@ -515,6 +515,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cbea4c82d15beb74e89700b20d509d1d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  baseMoveTime: 0.1
+  diagonalMultiplier: 1.5
+  gridCellSize: 1
+  gridOrigin: {x: 0, y: 0, z: 0}
 --- !u!114 &712406417
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -801,7 +805,7 @@ GameObject:
   - component: {fileID: 1910922631}
   - component: {fileID: 1910922633}
   m_Layer: 0
-  m_Name: ChainSelectAttack
+  m_Name: SwipeChainSelectAttack
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

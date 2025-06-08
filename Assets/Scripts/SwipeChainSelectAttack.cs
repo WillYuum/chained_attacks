@@ -10,7 +10,6 @@ public class SwipeChainSelectAttack : MonoBehaviour
     [field: SerializeField] public LayerMask EnemyLayerMask { get; private set; }
 
     public event Action<List<Vector2Int>> OnChainConfirmed;
-    // private List<Vector2Int> _currentChain = new List<Vector2Int>();
 
     private LineRenderer _lineRenderer;
     private Camera _mainCamera;
@@ -83,19 +82,28 @@ public class SwipeChainSelectAttack : MonoBehaviour
 
         Vector2Int dir = newGridPos - _currentGridPos;
 
-        // Allow only cardinal directions and steps of exactly 1 tile
-        if (!IsCardinal(dir) || dir.magnitude != 1)
-            return;
+        bool shiftHeld = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
 
-        // Check if going back one step
+        if (shiftHeld)
+        {
+            // Only allow diagonal (ordinal) steps
+            if (!IsOrdinal(dir))
+                return;
+        }
+        else
+        {
+            // Only allow cardinal steps
+            if (!IsCardinal(dir))
+                return;
+        }
+
+        // Undo step if going back to previous cell
         if (_swipeChain.Count >= 2 && newGridPos == _swipeChain[_swipeChain.Count - 2])
         {
-            // Undo last step
             _visitedPositions.Remove(_currentGridPos);
             _swipeChain.RemoveAt(_swipeChain.Count - 1);
             _currentGridPos = _swipeChain[_swipeChain.Count - 1];
 
-            // Also remove last enemy if it was on that tile
             if (_lockedEnemies.Count > 0)
             {
                 Transform lastEnemy = _lockedEnemies[_lockedEnemies.Count - 1];
@@ -120,18 +128,15 @@ public class SwipeChainSelectAttack : MonoBehaviour
         }
     }
 
-
     void EndSwipe()
     {
         _isSwiping = false;
-        // Do something with lockedEnemies if needed
         Debug.Log($"Swipe complete. Chained {_lockedEnemies.Count} enemies.");
 
         if (_swipeChain.Count > 0)
         {
             OnChainConfirmed?.Invoke(new List<Vector2Int>(_swipeChain));
         }
-
     }
 
     void DrawLine()
@@ -160,7 +165,13 @@ public class SwipeChainSelectAttack : MonoBehaviour
 
     bool IsCardinal(Vector2Int dir)
     {
-        return (dir == Vector2Int.up || dir == Vector2Int.down || dir == Vector2Int.left || dir == Vector2Int.right);
+        return dir == Vector2Int.up || dir == Vector2Int.down ||
+                dir == Vector2Int.left || dir == Vector2Int.right;
+    }
+
+    bool IsOrdinal(Vector2Int dir)
+    {
+        return Mathf.Abs(dir.x) == 1 && Mathf.Abs(dir.y) == 1;
     }
 
     Vector3 GetMouseWorldPosition()

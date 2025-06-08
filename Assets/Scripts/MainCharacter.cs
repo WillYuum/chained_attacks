@@ -6,7 +6,6 @@ public class MainCharacter : MonoBehaviour
 {
     private SwipeChainSelectAttack _swipeChainSelectAttack;
     private bool _isMoving = false;
-    private float _moveSpeed = 5f;
     void Awake()
     {
         _swipeChainSelectAttack = FindFirstObjectByType<SwipeChainSelectAttack>();
